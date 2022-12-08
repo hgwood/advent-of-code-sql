@@ -1,38 +1,8 @@
-create temporary table input (data text);
+\include_relative ../parse.psql
 
-\set copy_command '\\copy input from program ''cat ' :input ''''
-:copy_command
-
-with
-  lined_input as (
-     select *, row_number() over () as line_number from input
-  ),
-  blank_line_number as (
-    select 0 as line_number
-    union
-    select line_number from lined_input where data = ''
-    order by line_number
-  ),
-  inventory_range as (
-    select 
-      line_number + 1 as start, 
-      lead(
-        line_number, 
-        1, 
-        (select max(line_number) + 1 from lined_input)
-      ) over () as end 
-    from blank_line_number
-  ),
-  inventory as (
-    select 
-      dense_rank() over (order by start) as elf,
-      data::int as calory_amount
-    from inventory_range 
-    join lined_input 
-      on lined_input.line_number >= start and lined_input.line_number < "end"
-  )
-  select max(calory_total) from (
-    select sum(calory_amount) as calory_total 
-    from inventory 
-    group by elf
-  ) as inventory_total
+select max(calory_total) 
+from (
+  select sum(calory_amount) as calory_total 
+  from inventory 
+  group by elf
+) as inventory_total
