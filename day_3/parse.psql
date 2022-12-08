@@ -2,3 +2,11 @@ create temporary table input (data text);
 
 \set copy_command '\\copy input from program ''cat ' :input ''''
 :copy_command
+
+create or replace function priority(item_type text) returns int 
+  return (
+    case regexp_like(item_type, '[a-z]')
+      when true then ascii(item_type) - 97 + 1
+      else ascii(item_type) - 65 + 27
+    end
+  );

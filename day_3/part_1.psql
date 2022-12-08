@@ -1,13 +1,5 @@
 \include_relative parse.psql
 
-create or replace function priority(item_type text) returns int 
-  return (
-    case regexp_like(item_type, '[a-z]')
-      when true then ascii(item_type) - 97 + 1
-      else ascii(item_type) - 65 + 27
-    end
-  );
-
 select sum(priority(rucksack.common_item))
 from (
   select distinct
