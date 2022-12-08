@@ -1,20 +1,10 @@
-create temporary table input (data text);
+\include_relative parse.psql
 
-\set copy_command '\\copy input from program ''cat ' :input ''''
-:copy_command
-
-create temporary table shape_score (shape, score) as values 
-  ('Rock', 1), 
-  ('Paper', 2), 
-  ('Scissors', 3);
-create temporary table opponent_shape (shape, symbol) as values 
-  ('Rock', 'A'), 
-  ('Paper', 'B'), 
-  ('Scissors', 'C');
 create temporary table own_shape (shape, symbol) as values 
   ('Rock', 'X'), 
   ('Paper', 'Y'), 
   ('Scissors', 'Z');
+
 create temporary table strategy_guide (opponent_shape, own_shape, score) as values
   ('Paper', 'Rock', 1),
   ('Scissors', 'Paper', 2),
@@ -28,9 +18,8 @@ create temporary table strategy_guide (opponent_shape, own_shape, score) as valu
 
 select sum(score)
 from 
-  input
-  join lateral substr(input.data, 1, 1) as opponent (symbol) on true
-  join lateral substr(input.data, 3, 1) as own (symbol) on true
-  join opponent_shape on opponent_shape.symbol = opponent.symbol
-  join own_shape on own_shape.symbol = own.symbol
-  join strategy_guide on strategy_guide.opponent_shape = opponent_shape.shape and strategy_guide.own_shape = own_shape.shape;
+  game
+  join own_shape on own_shape.symbol = game.own_symbol
+  join strategy_guide on 
+    strategy_guide.opponent_shape = game.opponent_shape 
+    and strategy_guide.own_shape = own_shape.shape;

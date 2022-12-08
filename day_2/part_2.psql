@@ -1,0 +1,24 @@
+\include_relative parse.psql
+
+create temporary table round_end ("end", symbol) as values 
+  ('Loss', 'X'), 
+  ('Draw', 'Y'), 
+  ('Win', 'Z');
+create temporary table strategy_guide (opponent_shape, round_end, score) as values
+  ('Paper', 'Loss', 1),
+  ('Scissors', 'Loss', 2),
+  ('Rock', 'Loss', 3),
+  ('Rock', 'Draw', 4),
+  ('Paper', 'Draw', 5),
+  ('Scissors', 'Draw', 6),
+  ('Scissors', 'Win', 7),
+  ('Rock', 'Win', 8),
+  ('Paper', 'Win', 9);
+
+select sum(score)
+from 
+  game
+  join round_end on round_end.symbol = game.own_symbol
+  join strategy_guide on 
+    strategy_guide.opponent_shape = game.opponent_shape 
+    and strategy_guide.round_end = round_end.end;
