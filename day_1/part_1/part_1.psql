@@ -1,6 +1,7 @@
 create temporary table input (data text);
 
-\copy input from program 'cat day_1/part_1/part_1_input.txt'
+\set copy_command '\\copy input from program ''cat ' :input ''''
+:copy_command
 
 with
   lined_input as (
