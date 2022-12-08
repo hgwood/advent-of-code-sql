@@ -1,0 +1,32 @@
+\include_relative parse.psql
+
+create or replace function priority(item_type text) returns int 
+  return (
+    case regexp_like(item_type, '[a-z]')
+      when true then ascii(item_type) - 97 + 1
+      else ascii(item_type) - 65 + 27
+    end
+  );
+
+select sum(priority(rucksack.common_item))
+from (
+  select distinct
+    data as items,
+    common_item
+  from
+    input,
+    lateral (
+      select 
+        substr(data, 1, size) as first,
+        substr(data, 1 + size, size) as second
+      from
+        lateral (select char_length(data) / 2) as size (size)
+    ) as items_by_compartment,
+    lateral (
+      select first.item as common_item 
+      from
+        regexp_split_to_table(items_by_compartment.first, '') as first (item)
+        join regexp_split_to_table(items_by_compartment.second, '') as second (item) on 
+          second.item = first.item
+    ) as common_item
+) as rucksack;

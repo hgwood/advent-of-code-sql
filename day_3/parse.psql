@@ -1,0 +1,4 @@
+create temporary table input (data text);
+
+\set copy_command '\\copy input from program ''cat ' :input ''''
+:copy_command
