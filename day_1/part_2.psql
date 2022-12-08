@@ -1,4 +1,4 @@
-\include_relative ../parse.psql
+\include_relative parse.psql
 
 select sum(calory_total) 
 from (
