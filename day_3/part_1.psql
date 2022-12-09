@@ -1,10 +1,7 @@
 drop function if exists find_common_item(text[]);
-drop function if exists distinct_items(text);
-drop function if exists split_compartments(text);
-
 \include_relative parse.psql
 
-create function split_compartments(rucksack_items text) returns text[]
+create or replace function split_by_compartment(rucksack_items text) returns text[]
   return (
     select array[
       substr(rucksack_items, 1, size),
@@ -14,20 +11,4 @@ create function split_compartments(rucksack_items text) returns text[]
       (select char_length(rucksack_items) / 2) as _ (size)
   );
 
-create function distinct_items(items text) returns setof text
-  begin atomic;
-    select distinct item
-    from regexp_split_to_table(items, '') as _ (item);
-  end;
-
-create function find_common_item(item_sets text[]) returns text
-  return (
-    select item
-    from
-      unnest(item_sets) as items (items),
-      distinct_items(items) as item (item)
-    group by item
-    having count(*) = array_length(item_sets, 1)
-  );
-
-select sum(priority(find_common_item(split_compartments(data)))) from input;
+select sum(priority(find_common_item(split_by_compartment(rucksack_items)))) from input;

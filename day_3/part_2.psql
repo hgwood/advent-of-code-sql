@@ -1,33 +1,15 @@
 \include_relative parse.psql
 
 with
-  rucksack_item as (
+  rucksacks_by_elf_group as (
     select
-      (row_number() over () - 1) / 3 as elf_group_number,
-      data as rucksack_items
-    from input
-  ),
-  grouped_rucksack_items as (
-    select 
-      elf_group_number,
-      array_agg(rucksack_items) as rucksack_items
-    from rucksack_item
-    group by elf_group_number
-  ),
-  common_item_by_elf_group as (
-    select distinct
-      elf_group_number,
-      rucksack_items,
-      common_item
-    from grouped_rucksack_items,
-    lateral (
-      select third.item as common_item
-      from
-        regexp_split_to_table(rucksack_items[1], '') as first (item)
-        join regexp_split_to_table(rucksack_items[2], '') as second (item) on 
-          second.item = first.item
-        join regexp_split_to_table(rucksack_items[3], '') as third (item) on 
-          third.item = second.item
+      array_agg(rucksack_items) as rucksacks
+    from (
+      select
+        (row_number() over () - 1) / 3 as elf_group_number,
+        rucksack_items
+      from input
     ) as _
+    group by elf_group_number
   )
-  select sum(priority(common_item)) from common_item_by_elf_group;
+  select sum(priority(find_common_item(rucksacks))) from rucksacks_by_elf_group;

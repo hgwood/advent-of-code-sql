@@ -1,7 +1,23 @@
-create temporary table input (data text);
+create temporary table input (rucksack_items text);
 
 \set copy_command '\\copy input from program ''cat ' :input ''''
 :copy_command
+
+create or replace function distinct_items(items text) returns setof text
+  begin atomic;
+    select distinct item
+    from regexp_split_to_table(items, '') as _ (item);
+  end;
+
+create or replace function find_common_item(item_sets text[]) returns text
+  return (
+    select item
+    from
+      unnest(item_sets) as items (items),
+      distinct_items(items) as item (item)
+    group by item
+    having count(*) = array_length(item_sets, 1)
+  );
 
 create or replace function priority(item_type text) returns int 
   return (
