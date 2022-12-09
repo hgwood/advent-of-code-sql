@@ -1,34 +1,33 @@
-drop function if exists find_common_item(items_by_compartment);
+drop function if exists find_common_item(text[]);
+drop function if exists distinct_items(text);
 drop function if exists split_compartments(text);
-drop type if exists items_by_compartment;
 
 \include_relative parse.psql
 
-create type items_by_compartment as (
-  first text,
-  second text
-);
-
-create function split_compartments(items text) returns items_by_compartment
+create function split_compartments(rucksack_items text) returns text[]
   return (
-    select (
-      substr(items, 1, size),
-      substr(items, 1 + size, size)
-    )::items_by_compartment
+    select array[
+      substr(rucksack_items, 1, size),
+      substr(rucksack_items, 1 + size, size)
+    ]
     from
-      lateral (select char_length(items) / 2) as _ (size)
+      (select char_length(rucksack_items) / 2) as _ (size)
   );
 
-create function find_common_item(items_by_compartment) returns text
+create function distinct_items(items text) returns setof text
+  begin atomic;
+    select distinct item
+    from regexp_split_to_table(items, '') as _ (item);
+  end;
+
+create function find_common_item(item_sets text[]) returns text
   return (
-    select distinct first.item 
+    select item
     from
-      regexp_split_to_table($1.first, '') as first (item)
-      join regexp_split_to_table($1.second, '') as second (item) on 
-        second.item = first.item
+      unnest(item_sets) as items (items),
+      distinct_items(items) as item (item)
+    group by item
+    having count(*) = array_length(item_sets, 1)
   );
 
-select sum(priority(common_item))
-from 
-  input, 
-  find_common_item(split_compartments(data)) as common_item;
+select sum(priority(find_common_item(split_compartments(data)))) from input;
