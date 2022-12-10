@@ -1,12 +1,7 @@
 \include_relative parse.psql
 
 select count(*)
-from input,
-  regexp_split_to_array(pair_assignment_line, ',') as pair_assignments (pair_assignments),
-  regexp_split_to_array(pair_assignments[1], '-') as first_assignment_txt (first_assignment_txt),
-  regexp_split_to_array(pair_assignments[2], '-') as second_assignment_txt (second_assignment_txt),
-  int4range(first_assignment_txt[1]::int, first_assignment_txt[2]::int, '[]') as first_assignment (first_assignment),
-  int4range(second_assignment_txt[1]::int, second_assignment_txt[2]::int, '[]') as second_assignment (second_assignment)
+from assignment
 where 
   first_assignment <@ second_assignment or 
   first_assignment @> second_assignment;
