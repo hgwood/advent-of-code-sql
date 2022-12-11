@@ -1,0 +1,141 @@
+create temporary table input (line text);
+
+\set copy_command '\\copy input from program ''cat ' :input ''''
+:copy_command
+
+-- select * from input;
+
+-- Parsing stacks
+
+create or replace function count_stacks(stack_line text) returns int
+  return (char_length(stack_line) + 1) / 4;
+
+create or replace function stack_position(stack_number int) returns int
+  return (stack_number * 4) - 2;
+
+drop type if exists stacked_crate cascade;
+create type stacked_crate as (
+  stack_number int,
+  crate_value text
+);
+
+create or replace function parse_stack_line(line text) returns setof stacked_crate
+  begin atomic;
+    select (
+      stack_number,
+      nullif(substr(line, stack_position, 1), ' ')
+    )::stacked_crate
+    from 
+      generate_series(1, count_stacks(line)) as stack_number,
+      stack_position(stack_number);
+  end;
+
+create or replace view starting_stacks as (
+  select stack_number, line_number as vertical_position, crate_value
+  from (
+    select
+      row_number() over () as line_number,
+      line
+    from input
+  ) as input
+  join lateral parse_stack_line(line) as stack_info on regexp_like(line, '^\s*\[')
+  where crate_value is not null
+  order by stack_number, vertical_position
+);
+
+-- select * from starting_stacks;
+
+-- Parsing rearrangement procedure
+
+drop type if exists rearrangement_procedure_step cascade;
+create type rearrangement_procedure_step as (
+  quantity int,
+  "from" int,
+  "to" int
+);
+
+create or replace function parse_rearrangement_procedure_step_line(line text) returns move
+  return (
+    select (
+      match[1]::int,
+      match[2]::int, 
+      match[3]::int
+    )::move
+    from regexp_match(line, '^move (\d+) from (\d+) to (\d+)$') as match (match)
+  );
+
+create or replace view rearrangement_procedure as (
+  select line, quantity, "from", "to"
+  from input
+  join lateral parse_rearrangement_procedure_step_line(line) on starts_with(line, 'move ')
+);
+
+-- select * from rearrangement_procedure;
+
+-- Setting up table to track state of stacks
+
+drop table if exists stacks cascade;
+create table stacks (
+  stack_number int,
+  vertical_position int,
+  crate_value text,
+  primary key (stack_number, vertical_position)
+);
+insert into stacks select * from starting_stacks;
+-- select * from stacks;
+
+-- Functions to manipulate stacks
+
+create or replace function vertical_position_of_highest_crate(/* stack_number */int) returns int
+  return (
+    select min(vertical_position)
+    from stacks 
+    where 
+      stack_number = $1
+      and crate_value is not null
+  );
+
+create or replace function vertical_position_of_lowest_free_space(stack_number int) returns int
+  return coalesce(vertical_position_of_highest_crate(stack_number), 0) - 1;
+
+create or replace function hoist_crate(/* stack_number */int) returns text
+  begin atomic;
+    delete from stacks 
+    using vertical_position_of_highest_crate($1)
+    where 
+      stack_number = $1 
+      and vertical_position = vertical_position_of_highest_crate
+    returning crate_value;
+  end;
+
+create or replace function unhoist_crate(stack_number int, crate_value text) returns text
+  begin atomic;
+    insert into stacks 
+    values (
+      stack_number, 
+      vertical_position_of_lowest_free_space(stack_number),
+      crate_value
+    )
+    returning crate_value;
+  end;
+
+create or replace function move_crate("from" int, "to" int) returns text
+  return (select unhoist_crate("to", hoist_crate("from")));
+
+-- Running rearrangement procedure
+
+select 
+  line, 
+  quantity, 
+  "from", 
+  "to", 
+  occurence, 
+  move_crate("from", "to") as moved_crate_value
+from rearrangement_procedure
+join lateral generate_series(1, quantity) as occurence on true;
+
+-- Compute result
+
+select string_agg(crate_value, '' order by stack_number) as highest_crates
+from stacks, vertical_position_of_highest_crate(stack_number)
+where vertical_position = vertical_position_of_highest_crate;
