@@ -1,0 +1,28 @@
+create temporary table input (line text);
+
+\set copy_command '\\copy input from program ''cat ' :input ''''
+:copy_command
+
+-- select * from input;
+
+create view marker as (
+  select
+    row_number() over () as position, 
+    string_agg(char, '') over (rows between 3 preceding and 0 following) as sequence
+  from 
+    input, 
+    regexp_split_to_table(line, '') as _ (char)
+);
+
+select min(position)
+from (
+  select 
+    position,
+    count(distinct sequence_char)
+  from 
+    marker,
+    regexp_split_to_table(sequence, '') as sequence_char (sequence_char)
+  where char_length(sequence) = 4
+  group by position
+) as _
+where count = 4
