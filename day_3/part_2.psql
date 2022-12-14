@@ -1,4 +1,4 @@
-\include_relative parse.psql
+\include_relative common.psql
 
 with
   rucksacks_by_elf_group as (

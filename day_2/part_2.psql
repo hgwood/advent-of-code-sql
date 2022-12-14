@@ -1,4 +1,4 @@
-\include_relative parse.psql
+\include_relative common.psql
 
 create temporary table round_end ("end", symbol) as values 
   ('Loss', 'X'), 

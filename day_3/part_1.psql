@@ -1,4 +1,4 @@
-\include_relative parse.psql
+\include_relative common.psql
 
 create function split_by_compartment(rucksack_items text) returns text[]
   return (

@@ -1,4 +1,4 @@
-\include_relative parse.psql
+\include_relative common.psql
 
 select max(calory_total) 
 from (
