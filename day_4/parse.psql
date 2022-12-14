@@ -6,7 +6,7 @@ create temporary table input (pair_assignment_line text);
 create view assignment as (
   select first_assignment, second_assignment
   from input,
-    regexp_split_to_array(pair_assignment_line, ',') as pair_assignments (pair_assignments),
+    regexp_split_to_array(line, ',') as pair_assignments (pair_assignments),
     regexp_split_to_array(pair_assignments[1], '-') as first_assignment_txt (first_assignment_txt),
     regexp_split_to_array(pair_assignments[2], '-') as second_assignment_txt (second_assignment_txt),
     int4range(first_assignment_txt[1]::int, first_assignment_txt[2]::int, '[]') as first_assignment (first_assignment),
