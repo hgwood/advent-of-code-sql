@@ -1,7 +1,6 @@
-drop function if exists find_common_item(text[]);
 \include_relative parse.psql
 
-create or replace function split_by_compartment(rucksack_items text) returns text[]
+create function split_by_compartment(rucksack_items text) returns text[]
   return (
     select array[
       substr(rucksack_items, 1, size),

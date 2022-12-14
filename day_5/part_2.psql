@@ -7,19 +7,18 @@ create temporary table input (line text);
 
 -- Parsing stacks
 
-create or replace function count_stacks(stack_line text) returns int
+create function count_stacks(stack_line text) returns int
   return (char_length(stack_line) + 1) / 4;
 
-create or replace function stack_position(stack_number int) returns int
+create function stack_position(stack_number int) returns int
   return (stack_number * 4) - 2;
 
-drop type if exists stacked_crate cascade;
 create type stacked_crate as (
   stack_number int,
   crate_value text
 );
 
-create or replace function parse_stack_line(line text) returns setof stacked_crate
+create function parse_stack_line(line text) returns setof stacked_crate
   begin atomic;
     select (
       stack_number,
@@ -30,7 +29,7 @@ create or replace function parse_stack_line(line text) returns setof stacked_cra
       stack_position(stack_number);
   end;
 
-create or replace view starting_stacks as (
+create view starting_stacks as (
   select stack_number, line_number as vertical_position, crate_value
   from (
     select
@@ -47,14 +46,13 @@ create or replace view starting_stacks as (
 
 -- Parsing rearrangement procedure
 
-drop type if exists rearrangement_procedure_step cascade;
 create type rearrangement_procedure_step as (
   quantity int,
   "from" int,
   "to" int
 );
 
-create or replace function parse_rearrangement_procedure_step_line(line text) returns rearrangement_procedure_step
+create function parse_rearrangement_procedure_step_line(line text) returns rearrangement_procedure_step
   return (
     select (
       match[1]::int,
@@ -64,7 +62,7 @@ create or replace function parse_rearrangement_procedure_step_line(line text) re
     from regexp_match(line, '^move (\d+) from (\d+) to (\d+)$') as match (match)
   );
 
-create or replace view rearrangement_procedure as (
+create view rearrangement_procedure as (
   select line, quantity, "from", "to"
   from input
   join lateral parse_rearrangement_procedure_step_line(line) on starts_with(line, 'move ')
@@ -74,7 +72,6 @@ create or replace view rearrangement_procedure as (
 
 -- Setting up table to track state of stacks
 
-drop table if exists stacks cascade;
 create table stacks (
   stack_number int,
   vertical_position int,
@@ -83,7 +80,7 @@ create table stacks (
 );
 insert into stacks select * from starting_stacks;
 -- select * from stacks;
-drop table if exists crane cascade;
+
 create table crane (
   vertical_position int,
   crate_value text
@@ -91,7 +88,7 @@ create table crane (
 
 -- Functions to manipulate stacks
 
-create or replace function vertical_position_of_highest_crate(/* stack_number */int) returns int
+create function vertical_position_of_highest_crate(/* stack_number */int) returns int
   return (
     select min(vertical_position)
     from stacks 
@@ -100,10 +97,10 @@ create or replace function vertical_position_of_highest_crate(/* stack_number */
       and crate_value is not null
   );
 
-create or replace function vertical_position_of_lowest_free_space(stack_number int) returns int
+create function vertical_position_of_lowest_free_space(stack_number int) returns int
   return coalesce(vertical_position_of_highest_crate(stack_number), 0) - 1;
 
-create or replace function hoist_crates(/* stack_number */int, quantity int) returns text[]
+create function hoist_crates(/* stack_number */int, quantity int) returns text[]
   begin atomic;
     with 
       hoisted_crate as (
@@ -123,7 +120,7 @@ create or replace function hoist_crates(/* stack_number */int, quantity int) ret
       select array_agg(crate_value order by vertical_position) from crate_on_crane;
   end;
 
-create or replace function unhoist_crates(stack_number int) returns text[]
+create function unhoist_crates(stack_number int) returns text[]
   begin atomic;
     with 
       unhoisted_crate as (
@@ -146,7 +143,7 @@ create or replace function unhoist_crates(stack_number int) returns text[]
       select array_agg(crate_value order by vertical_position) from crate_off_crane;
   end;
 
-create or replace function move_crates("from" int, "to" int, quantity int) returns text[]
+create function move_crates("from" int, "to" int, quantity int) returns text[]
   begin atomic;
     select hoist_crates("from", quantity);
     select unhoist_crates("to");

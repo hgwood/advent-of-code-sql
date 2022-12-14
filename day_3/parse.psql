@@ -3,13 +3,13 @@ create temporary table input (rucksack_items text);
 \set copy_command '\\copy input from program ''cat ' :input ''''
 :copy_command
 
-create or replace function distinct_items(items text) returns setof text
+create function distinct_items(items text) returns setof text
   begin atomic;
     select distinct item
     from regexp_split_to_table(items, '') as _ (item);
   end;
 
-create or replace function find_common_item(item_sets text[]) returns text
+create function find_common_item(item_sets text[]) returns text
   return (
     select item
     from
@@ -19,7 +19,7 @@ create or replace function find_common_item(item_sets text[]) returns text
     having count(*) = array_length(item_sets, 1)
   );
 
-create or replace function priority(item_type text) returns int 
+create function priority(item_type text) returns int 
   return (
     case regexp_like(item_type, '[a-z]')
       when true then ascii(item_type) - 97 + 1

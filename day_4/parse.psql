@@ -3,7 +3,7 @@ create temporary table input (pair_assignment_line text);
 \set copy_command '\\copy input from program ''cat ' :input ''''
 :copy_command
 
-create or replace view assignment as (
+create view assignment as (
   select first_assignment, second_assignment
   from input,
     regexp_split_to_array(pair_assignment_line, ',') as pair_assignments (pair_assignments),
