@@ -54,13 +54,13 @@ create type rearrangement_procedure_step as (
   "to" int
 );
 
-create or replace function parse_rearrangement_procedure_step_line(line text) returns move
+create or replace function parse_rearrangement_procedure_step_line(line text) returns rearrangement_procedure_step
   return (
     select (
       match[1]::int,
       match[2]::int, 
       match[3]::int
-    )::move
+    )::rearrangement_procedure_step
     from regexp_match(line, '^move (\d+) from (\d+) to (\d+)$') as match (match)
   );
 
