@@ -1,8 +1,3 @@
-create temporary table input (data text);
-
-\set copy_command '\\copy input from program ''cat ' :input ''''
-:copy_command
-
 create temporary view inventory as (
   with
     lined_input as (
@@ -11,7 +6,7 @@ create temporary view inventory as (
     blank_line_number as (
       select 0 as line_number
       union
-      select line_number from lined_input where data = ''
+      select line_number from lined_input where line = ''
       order by line_number
     ),
     inventory_range as (
@@ -26,7 +21,7 @@ create temporary view inventory as (
     )
     select 
       dense_rank() over (order by start) as elf,
-      data::int as calory_amount
+      line::int as calory_amount
     from inventory_range 
     join lined_input 
       on lined_input.line_number >= start and lined_input.line_number < "end"

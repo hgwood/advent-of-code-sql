@@ -10,4 +10,4 @@ create function split_by_compartment(rucksack_items text) returns text[]
       (select char_length(rucksack_items) / 2) as _ (size)
   );
 
-select sum(priority(find_common_item(split_by_compartment(rucksack_items)))) from input;
+select sum(priority(find_common_item(split_by_compartment(line)))) from input;

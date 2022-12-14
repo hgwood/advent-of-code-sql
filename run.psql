@@ -3,6 +3,10 @@ drop schema if exists tmp cascade;
 create schema tmp;
 set search_path to tmp;
 
+create temporary table input (line text);
+\set copy_command '\\copy input from program ''cat ' :input ''''
+:copy_command
+
 \include :solver
 
 drop schema tmp cascade;

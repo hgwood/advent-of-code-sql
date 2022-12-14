@@ -1,8 +1,3 @@
-create temporary table input (data text);
-
-\set copy_command '\\copy input from program ''cat ' :input ''''
-:copy_command
-
 create temporary table shape_score (shape, score) as values 
   ('Rock', 1), 
   ('Paper', 2), 
@@ -19,7 +14,7 @@ create temporary view game as (
     opponent_shape.shape as opponent_shape
   from 
     input
-    join lateral substr(input.data, 1, 1) as opponent (symbol) on true
-    join lateral substr(input.data, 3, 1) as own (symbol) on true
+    join lateral substr(line, 1, 1) as opponent (symbol) on true
+    join lateral substr(line, 3, 1) as own (symbol) on true
     join opponent_shape on opponent_shape.symbol = opponent.symbol
 );
