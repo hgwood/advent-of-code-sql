@@ -1,0 +1,81 @@
+create table ordered_input as (
+  select 
+    row_number() over () as line_number, 
+    line
+  from input
+);
+
+create table command as (
+  select 
+    ordered_input.line_number, 
+    ordered_input.line, 
+    coalesce(ls_match[1], cd_match[1]) as command,
+    coalesce(ls_match[2], cd_match[2]) as arg,
+    range_info.result_range,
+    result.line_number as result_line_number,
+    result.line as result_line,
+    file_match[1]::bigint as result_file_size,
+    file_match[2] as result_file_name
+  from 
+    ordered_input
+    join (
+      select line_number, int8range(line_number + 1, lead(line_number) over (order by line_number)) as result_range
+      from ordered_input
+      where starts_with(line, '$')
+    ) as range_info on range_info.line_number = ordered_input.line_number
+    left join ordered_input as result on result.line_number <@ range_info.result_range,
+    regexp_match(ordered_input.line, '^\$ (ls)$') as ls_match, 
+    regexp_match(ordered_input.line, '^\$ (cd) (.*)$') as cd_match,
+    regexp_match(result.line, '^(\d+) (.*)$') as file_match
+  where starts_with(ordered_input.line, '$')
+);
+
+create function normalize_next_segment(path text[], next_segment text) returns text[]
+  return (
+    select case
+      when next_segment is null then path
+      when next_segment = '/' then '{/}'
+      when next_segment = '..' and path = '{/}' then path
+      when next_segment = '..' then trim_array(path, 1) 
+      else array_append(path, next_segment) 
+    end
+  );
+
+create aggregate normalize_path (text) (
+    sfunc = normalize_next_segment,
+    stype = text[],
+    initcond = '{/}'
+);
+
+create table pwd as (
+  select 
+    command.line_number,
+    normalize_path(cd.arg order by cd.line_number) as pwd
+  from (select distinct line_number from command) as command
+  left join command as cd on cd.command = 'cd' and cd.line_number < command.line_number
+  group by command.line_number
+);
+
+create table own_file_dir_size as (
+  select pwd, coalesce(sum(result_file_size), 0) as size
+  from command
+  join pwd on pwd.line_number = command.line_number
+  group by pwd
+);
+
+create function is_ancestor(path1 text[], path2 text[]) returns boolean
+  return (
+    select bool_or(path2 = trim_array(path1, i))
+    from generate_series(1, array_length(path1, 1) - 1) as i
+  );
+
+create table total_dir_size as (
+  select ancestor.pwd, ancestor.size + coalesce(sum(desendant.size), 0) as size
+  from own_file_dir_size as ancestor
+  left join own_file_dir_size as desendant on is_ancestor(desendant.pwd, ancestor.pwd)
+  group by ancestor.pwd, ancestor.size
+);
+
+select sum(size) 
+from total_dir_size
+where size <= 100000;
