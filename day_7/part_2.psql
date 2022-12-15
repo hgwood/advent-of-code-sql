@@ -1,0 +1,10 @@
+\include_relative common.psql
+
+select size
+from total_dir_size
+where
+  size = (
+    select min(size)
+    from total_dir_size
+    where size >= 30000000 - (70000000 - (select size from total_dir_size where pwd = '{/}'))
+  );
