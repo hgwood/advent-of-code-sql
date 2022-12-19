@@ -1,0 +1,61 @@
+create table _tree as (
+  select
+    row_number() over (partition by line_number) as x, 
+    line_number as y, 
+    char::int as height
+  from 
+    input, 
+    regexp_split_to_table(line, '') as _ (char)
+);
+
+create table tree as (
+  select
+    x,
+    y,
+    -(select max(x) from _tree) + x - 1 as rx,
+    -(select max(y) from _tree) + y - 1 as ry,
+    height
+  from _tree
+);
+
+create unique index tree_index_xy on tree using btree (x, y);
+create unique index tree_index_yx on tree using btree (y, x);
+
+create function visible_from_left(tree) returns boolean immutable
+  return (
+    select $1.x = 1 or bool_and(tree.height < $1.height)
+    from tree
+    where tree.x < $1.x and tree.y = $1.y
+  );
+
+create function visible_from_right(tree) returns boolean immutable
+  return (
+    select $1.rx = -1 or bool_and(tree.height < $1.height)
+    from tree
+    where tree.x > $1.x and tree.y = $1.y
+  );
+
+create function visible_from_up(tree) returns boolean immutable
+  return (
+    select $1.y = 1 or bool_and(tree.height < $1.height)
+    from tree
+    where tree.x = $1.x and tree.y < $1.y
+  );
+
+create function visible_from_down(tree) returns boolean immutable
+  return (
+    select $1.ry = -1 or bool_and(tree.height < $1.height)
+    from tree
+    where tree.x = $1.x and tree.y > $1.y
+  );
+
+\timing on
+
+select count(*) from tree 
+where 
+  visible_from_left(tree)
+  or visible_from_right(tree)
+  or visible_from_up(tree)
+  or visible_from_down(tree);
+
+\timing off
