@@ -1,0 +1,7 @@
+create table raw_input (line text);
+\set copy_command '\\copy raw_input from program ''cat ' :input ''''
+:copy_command
+
+create table input as
+select row_number() over () as line_number, line
+from raw_input;

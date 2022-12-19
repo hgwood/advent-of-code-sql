@@ -26,12 +26,7 @@ create function parse_stack_line(line text) returns setof stacked_crate
 
 create view starting_stacks as (
   select stack_number, line_number as vertical_position, crate_value
-  from (
-    select
-      row_number() over () as line_number,
-      line
-    from input
-  ) as input
+  from input
   join lateral parse_stack_line(line) as stack_info on regexp_like(line, '^\s*\[')
   where crate_value is not null
   order by stack_number, vertical_position

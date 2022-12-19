@@ -1,14 +1,7 @@
-create table ordered_input as (
-  select 
-    row_number() over () as line_number, 
-    line
-  from input
-);
-
 create table command as (
   select 
-    ordered_input.line_number, 
-    ordered_input.line, 
+    input.line_number, 
+    input.line, 
     coalesce(ls_match[1], cd_match[1]) as command,
     coalesce(ls_match[2], cd_match[2]) as arg,
     range_info.result_range,
@@ -17,17 +10,17 @@ create table command as (
     file_match[1]::bigint as result_file_size,
     file_match[2] as result_file_name
   from 
-    ordered_input
+    input
     join (
       select line_number, int8range(line_number + 1, lead(line_number) over (order by line_number)) as result_range
-      from ordered_input
+      from input
       where starts_with(line, '$')
-    ) as range_info on range_info.line_number = ordered_input.line_number
-    left join ordered_input as result on result.line_number <@ range_info.result_range,
-    regexp_match(ordered_input.line, '^\$ (ls)$') as ls_match, 
-    regexp_match(ordered_input.line, '^\$ (cd) (.*)$') as cd_match,
+    ) as range_info on range_info.line_number = input.line_number
+    left join input as result on result.line_number <@ range_info.result_range,
+    regexp_match(input.line, '^\$ (ls)$') as ls_match, 
+    regexp_match(input.line, '^\$ (cd) (.*)$') as cd_match,
     regexp_match(result.line, '^(\d+) (.*)$') as file_match
-  where starts_with(ordered_input.line, '$')
+  where starts_with(input.line, '$')
 );
 
 create function normalize_next_segment(path text[], next_segment text) returns text[]

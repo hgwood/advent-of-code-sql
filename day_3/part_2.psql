@@ -6,7 +6,7 @@ with
       array_agg(line) as rucksacks
     from (
       select
-        (row_number() over () - 1) / 3 as elf_group_number,
+        (line_number - 1) / 3 as elf_group_number,
         line
       from input
     ) as _
