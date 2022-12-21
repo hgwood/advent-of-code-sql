@@ -1,0 +1,70 @@
+\include_relative common.psql
+
+create function left_blocker_x(tree) returns int
+  return (
+    select max(x)
+    from tree
+    where tree.x < $1.x and tree.y = $1.y and tree.height >= $1.height
+  );
+
+create function left_scenic_score(tree) returns int immutable
+  return coalesce(
+    $1.x - left_blocker_x($1),
+    $1.x - 1
+  );
+
+create function right_blocker_x(tree) returns int
+  return (
+    select min(x)
+    from tree
+    where tree.x > $1.x and tree.y = $1.y and tree.height >= $1.height
+  );
+
+create function right_scenic_score(tree) returns int
+  return coalesce(
+    right_blocker_x($1) - $1.x,
+    -$1.rx - 1
+  );
+
+create function up_blocker_y(tree) returns int
+  return (
+    select max(y)
+    from tree
+    where tree.x = $1.x and tree.y < $1.y and tree.height >= $1.height
+  );
+
+create function up_scenic_score(tree) returns int
+  return coalesce(
+    $1.y - up_blocker_y($1),
+    $1.y - 1
+  );
+
+create function down_blocker_y(tree) returns int
+  return (
+    select min(y)
+    from tree
+    where tree.x = $1.x and tree.y > $1.y and tree.height >= $1.height
+  );
+
+create function down_scenic_score(tree) returns int
+  return coalesce(
+    down_blocker_y($1) - $1.y,
+    -$1.ry - 1
+  );
+
+create table scenic_score as
+select
+  tree.*,
+  left_scenic_score(tree),
+  right_scenic_score(tree),
+  up_scenic_score(tree),
+  down_scenic_score(tree)
+from tree;
+
+\timing on
+
+select
+  max(left_scenic_score * right_scenic_score * up_scenic_score * down_scenic_score)
+from scenic_score;
+
+\timing off
