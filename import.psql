@@ -1,7 +1,14 @@
+-- Imports an input file in the database.
+
+-- Required variables:
+-- - input: path the input file
+
+-- copy input file to table raw_input, one row per line
 create table raw_input (line text);
-\set copy_command '\\copy raw_input from program ''cat ' :input ''''
+\set copy_command '\\copy raw_input from ''' :input ''''
 :copy_command
 
+-- add line numbers, which ensure the original order of line is preserved
 create table input as
 select row_number() over () as line_number, line
 from raw_input;
