@@ -1,0 +1,71 @@
+create table movement as
+  select 
+    line_number as direction_number, 
+    regexp_match[1] as direction, 
+    generate_series as movement_number
+  from 
+    input, 
+    regexp_match(line, '([LRUD]) (\d+)'), 
+    generate_series(1, regexp_match[2]::int);
+
+create type int_point as (
+  x int,
+  y int
+);
+
+create function move_head("position" int_point, direction text) returns int_point
+  return (
+    select 
+      case direction
+        when 'L' then (position.x - 1, position.y)::int_point
+        when 'R' then (position.x + 1, position.y)::int_point
+        when 'U' then (position.x, position.y - 1)::int_point
+        when 'D' then (position.x, position.y + 1)::int_point
+      end
+  );
+
+create function distance(int, int) returns int
+  return abs($1 - $2);
+
+create function towards(int, int) returns int
+  return case when $1 < $2 then 1 else -1 end;
+
+create function move_tail(head_position int_point, tail_position int_point) returns int_point
+  return (
+    case
+      when distance(tail_position.x, head_position.x) <= 1 and distance(tail_position.y, head_position.y) <= 1 then tail_position
+      when tail_position.x = head_position.x then (tail_position.x, tail_position.y + towards(tail_position.y, head_position.y))::int_point
+      when tail_position.y = head_position.y then (tail_position.x + towards(tail_position.x, head_position.x), tail_position.y)::int_point
+      when distance(tail_position.x, head_position.x) < distance(tail_position.y, head_position.y) 
+        then (head_position.x, tail_position.y + towards(tail_position.y, head_position.y))::int_point
+      when distance(tail_position.y, head_position.y) < distance(tail_position.x, head_position.x) 
+        then (tail_position.x + towards(tail_position.x, head_position.x), head_position.y)::int_point
+      else null::int_point
+    end
+  );
+
+create type rope as (
+  head int_point,
+  tail int_point
+);
+
+create function move_rope(rope rope, direction text) returns rope
+  return (
+    select (new_head_position, new_tail_position)::rope
+    from 
+      move_head(rope.head, direction) as new_head_position, 
+      move_tail(new_head_position, rope.tail) as new_tail_position
+  );
+
+create aggregate move_rope (text) (
+    sfunc = move_rope,
+    stype = rope,
+    initcond = '("(0, 0)", "(0, 0)")'
+);
+
+create table rope_path as
+  select move_rope(direction) over (order by direction_number, movement_number) as rope
+  from movement;
+
+select count(distinct (rope).tail) 
+from rope_path;
