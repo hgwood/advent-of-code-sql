@@ -1,0 +1,71 @@
+create table input_with_sections as
+select
+  *,
+  sum(is_section_header::int)
+    over (
+      order by line_number
+      rows between unbounded preceding and current row
+    )
+    as section_number
+from
+  input
+  cross join lateral (
+    select line like '%:%' as is_section_header
+  ) as _
+where
+  line <> '';
+
+create table seed as
+select regexp_matches[1]::bigint as seed_number
+from input_with_sections, regexp_matches(line, '\d+', 'g')
+where section_number = 1;
+
+create table mapping as
+select
+  section_number as mapping_number,
+  int8range(
+    source_start,
+    source_start + length,
+    '[)'
+  ) as range,
+  destination_start - source_start as delta
+from
+  input_with_sections,
+  lateral (
+    select
+      parts[1]::bigint as destination_start,
+      parts[2]::bigint as source_start,
+      parts[3]::bigint as length
+    from regexp_split_to_array(line, '\s+') as parts
+  ) as _
+where section_number > 1 and not is_section_header;
+
+create function apply_mappings(n bigint, mappings mapping[], seed_number bigint) returns bigint
+  return coalesce(
+    (
+      select coalesce(n, seed_number) + mapping.delta
+      from unnest(mappings) as mapping
+      where mapping.range @> coalesce(n, seed_number)
+    ),
+    n,
+    seed_number
+  );
+
+create aggregate apply_mappings (mapping[], bigint) (
+    sfunc = apply_mappings,
+    stype = bigint
+);
+
+create table seed_location as
+select seed_number, apply_mappings(mappings, seed_number order by mapping_number) as location
+from
+  seed,
+  (
+    select mapping_number,
+    array_agg(mapping.*) as mappings
+    from mapping
+   group by mapping_number
+  ) as _
+group by seed_number;
+
+select min(location) from seed_location;
