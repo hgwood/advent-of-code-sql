@@ -1,6 +1,6 @@
-# Advent of Code 2022
+# Advent of Code SQL
 
-My solutions to the Advent of Code 2022, written in SQL.
+My solutions to Advent of Code, written in SQL.
 
 ## How to run
 
@@ -8,7 +8,7 @@ Run the database then run the solver for the day and part you want on the input 
 
 ```
 docker compose up -d
-sh run.sh day_1/part_1.psql day_1/example.txt
+sh run.sh 2022/day_1/part_1.psql 2022/day_1/example.txt
 ```
 
 ## How it works
