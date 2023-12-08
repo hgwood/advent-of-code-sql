@@ -1,3 +1,4 @@
+-- Detects the different sections of the input and removes empty lines.
 create table input_with_sections as
 select
   *,
@@ -15,11 +16,13 @@ from
 where
   line <> '';
 
+-- Parses the seed section.
 create table seed as
 select regexp_matches[1]::bigint as seed_number
 from input_with_sections, regexp_matches(line, '\d+', 'g')
 where section_number = 1;
 
+-- Parses the map sections.
 create table mapping as
 select
   section_number as mapping_number,
@@ -40,6 +43,15 @@ from
   ) as _
 where section_number > 1 and not is_section_header;
 
+-- Maps n using mappings:
+-- - Finds which mapping matches n (n is included in the mapping range)
+-- - Adds the mapping delta to n
+-- - Returns the result
+-- - If no mapping matches n, returns n
+--
+-- If n is null, uses seed_number instead. This allows this function to work as
+-- an aggregate state transition function while still allowing a dynamic value
+-- for initialization of the state.
 create function apply_mappings(n bigint, mappings mapping[], seed_number bigint) returns bigint
   return coalesce(
     (
@@ -56,16 +68,20 @@ create aggregate apply_mappings (mapping[], bigint) (
     stype = bigint
 );
 
+-- Computes the location for each seed by applying all mappings to each seed
+-- number.
 create table seed_location as
 select seed_number, apply_mappings(mappings, seed_number order by mapping_number) as location
 from
   seed,
   (
-    select mapping_number,
-    array_agg(mapping.*) as mappings
+    select
+      mapping_number,
+      array_agg(mapping.*) as mappings
     from mapping
-   group by mapping_number
+    group by mapping_number
   ) as _
 group by seed_number;
 
+-- Finally, select the lowest location.
 select min(location) from seed_location;
