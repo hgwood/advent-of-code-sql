@@ -1,0 +1,14 @@
+create table instruction as
+select
+  row_number() over () as instruction_number,
+  direction
+from input, regexp_split_to_table(line, '') as direction
+where line_number = 1;
+
+create table node as
+select
+  parts[1] as name,
+  parts[2] as left,
+  parts[3] as right
+from input, regexp_matches(line, '(\w+) = \((\w+), (\w+)\)') as parts
+where line_number >= 3;

@@ -1,19 +1,27 @@
 \include_relative common.psql
 
+create table max_instruction as
+select max(instruction_number) from instruction;
+
 with
   recursive step as (
     select
-      'AAA' as node_name,
+      node.name as node_name,
       instruction_number,
       direction,
-      1 as iteration
+      1 as iteration,
+      false as stop
     from instruction
-    where instruction_number = 1
+    cross join node
+    where
+      instruction_number = 1
+      and right(node.name, 1) = 'A'
     union all
     select
       next.node,
       instruction.*,
-      step.iteration + 1
+      step.iteration + 1,
+      every(right(next.node, 1) = 'Z') over (partition by iteration)
     from step
     join node on node.name = step.node_name
     cross join lateral (
@@ -23,12 +31,14 @@ with
           else node.right
         end as node,
         case step.instruction_number
-          when (select max(instruction_number) from instruction) then 1
+          when (select * from max_instruction) then 1
           else step.instruction_number + 1
         end as instruction
     ) as next
     join instruction on
       instruction.instruction_number = next.instruction
-      and next.node <> 'ZZZ'
+      -- and iteration < 100
+    where not stop
   )
-  select count(*) from step
+  select max(iteration) - 1 as solution from step
+  -- select * from step
