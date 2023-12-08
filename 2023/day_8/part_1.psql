@@ -1,0 +1,47 @@
+create table instruction as
+select
+  row_number() over () as instruction_number,
+  direction
+from input, regexp_split_to_table(line, '') as direction
+where line_number = 1;
+
+create table node as
+select
+  parts[1] as name,
+  parts[2] as left,
+  parts[3] as right
+from input, regexp_matches(line, '(\w+) = \((\w+), (\w+)\)') as parts
+where line_number >= 3;
+
+with
+  recursive step as (
+    select
+      'AAA' as node_name,
+      instruction_number,
+      direction,
+      1 as iteration
+    from instruction
+    where instruction_number = 1
+    union all
+    select
+      next.node,
+      instruction.*,
+      step.iteration + 1
+    from step
+    join node on node.name = step.node_name
+    cross join lateral (
+      select
+        case step.direction
+          when 'L' then node.left
+          else node.right
+        end as node,
+        case step.instruction_number
+          when (select max(instruction_number) from instruction) then 1
+          else step.instruction_number + 1
+        end as instruction
+    ) as next
+    join instruction on
+      instruction.instruction_number = next.instruction
+      and next.node <> 'ZZZ'
+  )
+  select count(*) from step
