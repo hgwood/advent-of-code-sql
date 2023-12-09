@@ -1,49 +1,56 @@
 create table history as
-select line_number as seq, row_number() over (partition by line_number) as i, n::bigint
-from input, regexp_split_to_table(line, ' ') as n;
+select
+  line_number as seq,
+  row_number() over (partition by line_number) as x, -- x because it works like a horizontal coordinate (higher is ➡️)
+  value::bigint
+from input, regexp_split_to_table(line, ' ') as value;
 
-create table pyramid as
+-- I call it pyramid because the representation suggested in the statement looks
+-- like an upside-down pyramid.
+create table pyramid_cell as
 with
   recursive step_up as (
     select
       seq,
-      i,
-      n,
-      1 as iteration
+      x,
+      1 as y, -- like a vertical coordinate (higher is ⬆️ the pyramid)
+      value
     from history
     union all
     select
       seq,
-      i,
-      lead(n) over (partition by seq) - n,
-      iteration + 1
+      x,
+      y + 1,
+      lead(value) over (partition by seq) - value
     from step_up
-    where n is not null
+    where value is not null
   )
 select
   *,
-  max(i) filter (where n is not null) over (partition by seq, iteration) as max_i,
-  max(iteration) over (partition by seq) as max_iteration
+  max(x) filter (where value is not null) over (partition by seq, y) as level_width,
+  max(y) over (partition by seq) as pyramid_height
 from step_up;
 
 with
   recursive step_down as (
     select
       seq,
-      0::bigint as n,
-      max_iteration as iteration
-    from pyramid
-    where iteration = max_iteration
+      y,
+      0::bigint as value
+    from pyramid_cell
+    where y = pyramid_height
     union all
     select
       step_down.seq,
-      step_down.n + pyramid.n,
-      step_down.iteration - 1
+      step_down.y - 1,
+      step_down.value + right_most_cell_below.value
     from step_down
-    join pyramid on
-      pyramid.iteration = step_down.iteration - 1
-      and pyramid.seq = step_down.seq
-      and pyramid.i = pyramid.max_i
-    where step_down.iteration > 0
+    join pyramid_cell as right_most_cell_below on
+      right_most_cell_below.seq = step_down.seq
+      and right_most_cell_below.x = right_most_cell_below.level_width
+      and right_most_cell_below.y = step_down.y - 1
+    where step_down.y > 0
   )
-select sum(n) from step_down where iteration = 1;
+select sum(value)
+from step_down
+where y = 1;
