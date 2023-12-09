@@ -1,35 +1,4 @@
-create table history as
-select
-  line_number as seq,
-  row_number() over (partition by line_number) as x, -- x because it works like a horizontal coordinate (higher is ➡️)
-  value::bigint
-from input, regexp_split_to_table(line, ' ') as value;
-
--- I call it pyramid because the representation suggested in the statement looks
--- like an upside-down pyramid.
-create table pyramid_cell as
-with
-  recursive step_up as (
-    select
-      seq,
-      x,
-      1 as y, -- like a vertical coordinate (higher is ⬆️ the pyramid)
-      value
-    from history
-    union all
-    select
-      seq,
-      x,
-      y + 1,
-      lead(value) over (partition by seq) - value
-    from step_up
-    where value is not null
-  )
-select
-  *,
-  max(x) filter (where value is not null) over (partition by seq, y) as level_width,
-  max(y) over (partition by seq) as pyramid_height
-from step_up;
+\include_relative common.psql
 
 with
   recursive step_down as (
