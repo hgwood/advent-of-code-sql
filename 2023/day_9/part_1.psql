@@ -1,0 +1,49 @@
+create table history as
+select line_number as seq, row_number() over (partition by line_number) as i, n::bigint
+from input, regexp_split_to_table(line, ' ') as n;
+
+create table pyramid as
+with
+  recursive step_up as (
+    select
+      seq,
+      i,
+      n,
+      1 as iteration
+    from history
+    union all
+    select
+      seq,
+      i,
+      lead(n) over (partition by seq) - n,
+      iteration + 1
+    from step_up
+    where n is not null
+  )
+select
+  *,
+  max(i) filter (where n is not null) over (partition by seq, iteration) as max_i,
+  max(iteration) over (partition by seq) as max_iteration
+from step_up;
+
+with
+  recursive step_down as (
+    select
+      seq,
+      0::bigint as n,
+      max_iteration as iteration
+    from pyramid
+    where iteration = max_iteration
+    union all
+    select
+      step_down.seq,
+      step_down.n + pyramid.n,
+      step_down.iteration - 1
+    from step_down
+    join pyramid on
+      pyramid.iteration = step_down.iteration - 1
+      and pyramid.seq = step_down.seq
+      and pyramid.i = pyramid.max_i
+    where step_down.iteration > 0
+  )
+select sum(n) from step_down where iteration = 1;
