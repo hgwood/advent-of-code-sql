@@ -1,0 +1,13 @@
+select sum(calibration_value)
+from (
+  select
+    any_value(first * 10 + last) as calibration_value
+  from (
+    select
+      *,
+      first_value(c[1]::int) over (partition by line_number) as first,
+      last_value(c[1]::int) over (partition by line_number) as last
+    from input, regexp_matches(line, '\d', 'g') as _ (c)
+  )
+  group by line_number
+);
