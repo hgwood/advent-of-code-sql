@@ -1,0 +1,29 @@
+create table cube_showing as
+select
+  e[2]::bigint as game,
+  d[1]::bigint as n,
+  d[2] as color
+from
+  input,
+  regexp_split_to_array(line, ':') as a,
+  regexp_split_to_table(a[2], ';') as b,
+  regexp_split_to_table(b, ',') as c,
+  regexp_split_to_array(trim(both ' ' from c), ' ') as d,
+  regexp_split_to_array(a[1], ' ') as e;
+
+
+select sum(game)
+from (
+  select distinct game, every(possible) over (partition by game) as possible
+  from (
+    select
+      *,
+      case color
+        when 'red' then n <= 12
+        when 'green' then n <= 13
+        when 'blue' then n <= 14
+      end as possible
+    from cube_showing
+  )
+)
+where possible;
