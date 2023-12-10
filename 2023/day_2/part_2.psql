@@ -1,0 +1,31 @@
+create table cube_showing as
+select
+  e[2]::bigint as game,
+  d[1]::bigint as n,
+  d[2] as color
+from
+  input,
+  regexp_split_to_array(line, ':') as a,
+  regexp_split_to_table(a[2], ';') as b,
+  regexp_split_to_table(b, ',') as c,
+  regexp_split_to_array(trim(both ' ' from c), ' ') as d,
+  regexp_split_to_array(a[1], ' ') as e;
+
+create function mult(bigint, bigint) returns bigint return ($1 * $2);
+
+create aggregate mult(bigint) (
+  sfunc = mult,
+  stype = bigint,
+  initcond = '1'
+);
+
+select sum(power)
+from (
+  select mult(min_cubes) as power
+  from (
+    select game, color, max(n) as min_cubes
+    from cube_showing
+    group by game, color
+  )
+  group by game
+);
