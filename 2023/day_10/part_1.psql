@@ -1,0 +1,26 @@
+create table tile as
+select
+  row_number() over (partition by line_number) as x,
+  line_number as y,
+  value
+from input, regexp_split_to_table(line, '') as value;
+
+create function connected(tile, tile) returns boolean
+  return (
+    $1.x + 1 = $2.x and $1.y = $2.y and $1.value in ('S', '-', 'L', 'F') and $2.value in ('S', '-', 'J', '7')
+    or $1.x - 1 = $2.x and $1.y = $2.y and $1.value in ('S', '-', 'J', '7') and $2.value in ('S', '-', 'L', 'F')
+    or $1.x = $2.x and $1.y + 1 = $2.y and $1.value in ('S', '|', '7', 'F') and $2.value in ('S', '|', 'J', 'L')
+    or $1.x = $2.x and $1.y - 1 = $2.y and $1.value in ('S', '|', 'J', 'L') and $2.value in ('S', '|', '7', 'F')
+  );
+
+with
+  recursive loop_tile as (
+    select *
+    from tile
+    where value = 'S'
+    union
+    select tile.*
+    from loop_tile
+    join tile on connected(tile, loop_tile)
+  )
+select count(*) / 2 from loop_tile;
