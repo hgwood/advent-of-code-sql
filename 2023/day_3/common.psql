@@ -1,22 +1,17 @@
-create table schematic_point as
-select
-  row_number() over (partition by line_number) as x,
-  line_number as y,
-  value
-from input, string_to_table(line, null) as value;
+\include_relative ../../utils/grid.psql
 
-create table schematic_point_in_context as
+create table schematic_unit as
 select
-  schematic_point.*,
+  input_grid_cell.*,
   substring(input.line from x::int - 1 for 1) as preceding,
   substring(input.line from x::int) as following
-from schematic_point
-join input on input.line_number = schematic_point.y;
+from input_grid_cell
+join input on line_number = y;
 
 create table part_number as
 select x, y, match[1] as value
 from
-  schematic_point_in_context,
+  schematic_unit,
   regexp_match(following, '^\d+') as match
 where
   (preceding = '' or regexp_like(preceding, '\D'))
@@ -24,7 +19,7 @@ where
 
 create table part as
 select *
-from schematic_point
+from schematic_unit
 where regexp_like(value, '[^\d.]');
 
 create function adjacent(part, part_number) returns boolean return (
