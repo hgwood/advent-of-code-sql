@@ -1,0 +1,23 @@
+\include_relative part_1.psql
+
+create function mult(bigint, bigint) returns bigint return ($1 * $2);
+
+create aggregate mult(bigint) (
+  sfunc = mult,
+  stype = bigint,
+  initcond = '1'
+);
+
+create table gear as
+select part.x, part.y, mult(part_number.value::bigint) as ratio
+from part
+join part_number on adjacent(
+  part,
+  part_number
+)
+where part.value = '*'
+group by part.x, part.y
+having count(*) = 2;
+
+select sum(ratio)
+from gear;
