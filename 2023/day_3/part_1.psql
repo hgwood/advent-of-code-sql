@@ -1,36 +1,4 @@
-create table schematic_point as
-select
-  row_number() over (partition by line_number) as x,
-  line_number as y,
-  value
-from input, string_to_table(line, null) as value;
-
-create table schematic_point_in_context as
-select
-  schematic_point.*,
-  substring(input.line from x::int - 1 for 1) as preceding,
-  substring(input.line from x::int) as following
-from schematic_point
-join input on input.line_number = schematic_point.y;
-
-create table part_number as
-select x, y, match[1] as value
-from
-  schematic_point_in_context,
-  regexp_match(following, '^\d+') as match
-where
-  (preceding = '' or regexp_like(preceding, '\D'))
-  and regexp_like(value, '\d');
-
-create table part as
-select *
-from schematic_point
-where regexp_like(value, '[^\d.]');
-
-create function adjacent(part, part_number) returns boolean return (
-  $1.x between $2.x - 1 and $2.x + length($2.value)
-  and $1.y between $2.y - 1 and $2.y + 1
-);
+\include_relative common.psql
 
 select sum(part_number.value::bigint)
 from part_number

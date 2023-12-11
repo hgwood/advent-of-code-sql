@@ -1,4 +1,4 @@
-\include_relative part_1.psql
+\include_relative common.psql
 
 create function mult(bigint, bigint) returns bigint return ($1 * $2);
 
