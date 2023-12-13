@@ -1,0 +1,68 @@
+create table condition_record_row as
+select
+  line_number as row,
+  part[1] as conditions,
+  damaged_group_sizes::int[]
+from
+  input,
+  regexp_split_to_array(line, ' ') as part,
+  regexp_split_to_array(part[2], ',') as damaged_group_sizes;
+
+-- Returns up to two possible repairs that can be made to the given condition
+-- record row.
+--
+-- These possible repairs are new condition record rows with one of two kinds of
+-- changes applied to them:
+-- - The first unknown (?) is replaced with operational (.)
+-- - The first damaged group is popped and placed at the first position it can
+--   fit in, i.e.:
+--   - No damaged group can ever be placed before it (no unknown or damaged
+--     springs before the position)
+--   - There are exactly n continuous unknown or damaged springs at the
+--     position, where n is the size of the placed damaged group
+--
+-- Up to one repair of each kind is returned. When a damaged group is placed,
+-- damaged springs are represented using '*' instead of '#' to mark those
+-- damaged springs as being allocated to a damaged group, i.e. not allocatable
+-- to another group.
+create function possible_repair(condition_record_row) returns setof condition_record_row begin atomic;
+  select
+    $1.row,
+    overlay($1.conditions placing '.' from position_of_first_unknown for 1),
+    $1.damaged_group_sizes
+  from
+    position('?' in $1.conditions) as position_of_first_unknown
+  where position_of_first_unknown > 0
+  union
+  select
+    $1.row,
+    concat(prefix, damaged_group, damaged_group_right_boundary, suffix),
+    $1.damaged_group_sizes[2:]
+  from
+    concat('^([.*]*\.)?[?#]{', $1.damaged_group_sizes[1],'}([.?]|$)(.*)$') as pattern,
+    regexp_match($1.conditions, pattern) as match,
+    repeat(match[1], 1) as prefix,
+    repeat('*', $1.damaged_group_sizes[1]) as damaged_group,
+    repeat('.', length(match[2])) as damaged_group_right_boundary,
+    repeat(match[3], 1) as suffix
+  where match is not null;
+end;
+
+-- Returns true if and only if the given condition record row has no more
+-- unknown springs and no more damaged groups to be placed.
+create function fully_repaired(condition_record_row) returns boolean return (
+  regexp_like($1.conditions, '^[.*]+$')
+  and array_length($1.damaged_group_sizes, 1) is null
+);
+
+with recursive repair_step as (
+  select * from condition_record_row
+  union
+  select possible_repair.*
+  from
+    repair_step,
+    possible_repair(repair_step)
+)
+select count(*)
+from repair_step
+where fully_repaired(repair_step);
