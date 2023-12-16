@@ -1,0 +1,101 @@
+create table terrain_cell as
+with input_delimited as (
+  select
+    *,
+    sum(is_pattern_delimiter::int)
+      over (
+        order by line_number
+        rows between unbounded preceding and current row
+      ) + 1
+      as pattern
+  from
+    input,
+    lateral (
+      select line = '' as is_pattern_delimiter
+    )
+)
+select
+  pattern,
+  row_number() over (partition by line_number) as x,
+  -- This makes y reset to 1 when starting another pattern.
+  dense_rank() over (partition by pattern order by line_number) as y,
+  value
+from
+  input_delimited,
+  string_to_table(line, null) as value;
+
+create table terrain_column as
+select pattern, x, string_agg(value, '' order by y) as value
+from terrain_cell
+group by pattern, x;
+
+-- Yes, this is completely redundant as it simply reconstructs lines from the
+-- input, but I like the symmetry with columns.
+create table terrain_row as
+select pattern, y, string_agg(value, '' order by x) as value
+from terrain_cell
+group by pattern, y;
+
+create table horizontal_reflection as
+with recursive horizontal_step as (
+  -- Pick adjacent rows that mirror each other.
+  select
+    row_above.pattern,
+    row_above.y as y,
+    row_above.y as low_y,
+    row_below.y as high_y,
+    row_above.value = row_below.value as mirrored
+  from terrain_row as row_above
+  join terrain_row as row_below on row_below.pattern = row_above.pattern and row_below.y = row_above.y + 1
+  where row_above.value = row_below.value
+  union
+  -- Recursively expand the reflection where boundary rows mirror each other,
+  -- until y is out of bounds.
+  select
+    row_above.pattern,
+    horizontal_step.y,
+    row_above.y as low_y,
+    row_below.y as high_y,
+    row_above.value = row_below.value
+  from horizontal_step
+  join terrain_row as row_above on row_above.pattern = horizontal_step.pattern and row_above.y = low_y - 1
+  join terrain_row as row_below on row_below.pattern = horizontal_step.pattern and row_below.y = high_y + 1
+  where horizontal_step.mirrored
+)
+-- For each reflection that was identified at the start, pick only those where
+-- boundary rows mirror each other at every step.
+select pattern, y
+from horizontal_step
+group by pattern, y
+having every(mirrored);
+
+-- Same thing but vertically.
+create table vertical_reflection as
+with recursive vertical_step as (
+  select
+    column_left.pattern,
+    column_left.x as x,
+    column_left.x as low_x,
+    column_right.x as high_x,
+    true as mirrored
+  from terrain_column as column_left
+  join terrain_column as column_right on column_right.pattern = column_left.pattern and column_right.x = column_left.x + 1
+  where column_left.value = column_right.value
+  union
+  select
+    column_left.pattern,
+    vertical_step.x,
+    column_left.x as low_x,
+    column_right.x as high_x,
+    column_left.value = column_right.value
+  from vertical_step
+  join terrain_column as column_left on column_left.pattern = vertical_step.pattern and column_left.x = low_x - 1
+  join terrain_column as column_right on column_right.pattern = vertical_step.pattern and column_right.x = high_x + 1
+  where vertical_step.mirrored
+)
+select pattern, x
+from vertical_step
+group by pattern, x
+having every(mirrored);
+
+select (select sum(x) from vertical_reflection) + (select sum(y) * 100 from horizontal_reflection) as summary;
