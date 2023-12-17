@@ -1,0 +1,28 @@
+create table sequence_step as
+select
+  row_number() over () as step,
+  value
+from
+  input,
+  regexp_split_to_table(line, ',') as value;
+
+create function hash_step(int, text) returns int return (
+  ($1 + ascii($2)) * 17 % 256
+);
+
+create aggregate hash_step (text) (
+    sfunc = hash_step,
+    stype = int,
+    initcond = '0'
+);
+
+create table hash as
+select
+  step,
+  hash_step(char) as value
+from
+  sequence_step,
+  string_to_table(value, null) as char
+group by step;
+
+select sum(value) from hash;
