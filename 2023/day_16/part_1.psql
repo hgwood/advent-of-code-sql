@@ -1,0 +1,55 @@
+\include_relative ../../utils/grid.psql
+
+create type xy as (
+  x bigint,
+  y bigint
+);
+
+create function next_position(x bigint, y bigint, direction text) returns xy return (
+  case direction
+    when '>' then (x + 1, y)::xy
+    when 'v' then (x, y + 1)::xy
+    when '<' then (x - 1, y)::xy
+    else (x, y - 1)::xy
+  end
+);
+
+create function next_direction(cell text, direction text) returns setof text begin atomic;
+  select '>'
+  where (direction, cell) in (('>', '.'), ('v', '\'), ('^', '/'), ('>', '-'), ('v', '-'), ('^', '-'))
+  union
+  select 'v'
+  where (direction, cell) in (('v', '.'), ('>', '\'), ('<', '/'), ('v', '|'), ('<', '|'), ('>', '|'))
+  union
+  select '<'
+  where (direction, cell) in (('<', '.'), ('^', '\'), ('v', '/'), ('<', '-'), ('v', '-'), ('^', '-'))
+  union
+  select '^'
+  where (direction, cell) in (('^', '.'), ('<', '\'), ('>', '/'), ('^', '|'), ('<', '|'), ('>', '|'));
+end;
+
+with recursive step as (
+  select
+    x,
+    y,
+    value,
+    next_direction as direction
+  from
+    input_grid_cell,
+    next_direction(input_grid_cell.value, '>')
+  where (x, y) = (1, 1)
+  union
+  select
+    next_position.x,
+    next_position.y,
+    input_grid_cell.value,
+    next_direction
+  from
+    step,
+    next_position(step.x, step.y, step.direction)
+    join input_grid_cell on (input_grid_cell.x, input_grid_cell.y) = (next_position.x, next_position.y),
+    next_direction(input_grid_cell.value, direction) as next_direction
+)
+select count(*) from (
+  select distinct x, y from step
+);
