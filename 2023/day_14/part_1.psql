@@ -1,0 +1,46 @@
+\include_relative ../../utils/grid.psql
+
+create table platform_column as
+select x, string_agg(value, '' order by y) as value
+from input_grid_cell
+group by x;
+
+-- Takes a section of a platform with no cube-shaped rocks, and returns it
+-- with all rounded rocks rolled to the left.
+create function roll(text) returns text return (
+  select string_agg(char, '' order by char desc)
+  from string_to_table($1, null) as char
+);
+
+create table platform_column_after_roll as
+select x, string_agg(part_after_roll, '' order by y) as value
+from (
+  select
+    *,
+    roll(part) as part_after_roll,
+    row_number() over (partition by x) as y
+  from
+    platform_column,
+    regexp_matches(value, '(^|#)([.O]*)', 'g') as match,
+    unnest(match) as part
+)
+group by x;
+
+create table platform_cell_after_roll as
+select
+  x,
+  row_number() over (partition by x) as y,
+  string_to_table as value
+from
+  platform_column_after_roll,
+  string_to_table(value, null);
+
+select sum(load)
+from (
+  select
+    *,
+    row_number() over (partition by x order by y desc) as load
+  from
+    platform_cell_after_roll
+)
+where value = 'O';
