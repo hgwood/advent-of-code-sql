@@ -1,28 +1,23 @@
 create table sequence_step as
-select
-  row_number() over () as step,
-  value
+select instruction
 from
   input,
-  regexp_split_to_table(line, ',') as value;
+  regexp_split_to_table(line, ',') as instruction;
 
-create function hash_step(int, text) returns int return (
+create function hash_next_char(int, text) returns int return (
   ($1 + ascii($2)) * 17 % 256
 );
 
-create aggregate hash_step (text) (
-    sfunc = hash_step,
+create aggregate hash_next_char(text) (
+    sfunc = hash_next_char,
     stype = int,
     initcond = '0'
 );
 
-create table hash as
-select
-  step,
-  hash_step(char) as value
-from
-  sequence_step,
-  string_to_table(value, null) as char
-group by step;
+create function hash(text) returns int return (
+  select hash_next_char(char)
+  from string_to_table($1, null) as char
+);
 
-select sum(value) from hash;
+select sum(hash(instruction))
+from sequence_step;
