@@ -20,3 +20,10 @@ that all objects created after that are placed in this schema. Then it runs
 `import.psql` which import the input file into the `input` table. Then it runs
 the solver (a `.psql` file). Finally, it drops the `tmp` schema, which drops all
 objects created by the solver.
+
+## Philosophy
+
+I mostly use SQL as a purely functional language here. Once the input is loaded
+into the `input` table, I try to only use `select` to compute stuff from it,
+along with `create table as` to store results for further computations. I try
+not to use stateful tables (2022 day 5 is the only exception).
